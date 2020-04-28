@@ -55,11 +55,3 @@ Python, Linux, Tornado
 
 
 
-### Issues encounter
-issue1: the json file returned by the API is not of valid form; ``pickle.dump()`` and ``pickle.load()`` are used to save and read the response
-
-issue2: valid response won't be available until the scann finish; used a while loop to check until the scann finishes
-    
-
-
-
