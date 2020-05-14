@@ -16,7 +16,7 @@ You need to install python and have git set up.
 step1: create a folder that you want to hold the git repository
 
 step2: do git clone
-       ``git clone git@gitlab.com:estelle_wu/fortinet_test.git``
+       ``git@github.com:EstelleWu/FileScanner.git``
 
 
 
