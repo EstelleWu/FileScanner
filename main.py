@@ -7,12 +7,15 @@ import hashlib
 import parser
 import pickle
 import requests
-
+import pymongo
 
 BASE_URL = 'https://www.virustotal.com/vtapi/v2/file/'
 API_KEY = 'ff75f48440f980444e349cd8327da712fa2dfc2eec455cb6c894734f636b7a67'
 PUBLIC_API_SLEEP_TIME = 30
 SHELF_LIFE = 24 * 60 * 60
+client = pymongo.MongoClient("mongodb+srv://siyan:UBC_CPSC_2020@fs-ahm8n.mongodb.net/test?retryWrites=true&w=majority")
+db = client.test
+mycol = db["inventory"]
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
@@ -36,12 +39,15 @@ class UploadHandler(tornado.web.RequestHandler):
                 if str(file_sha256) in line:
                     existAlready = True
                     break
+        
         if not existAlready:
             print("upload and scan")
             self.upload_to_scan(file)
+
         print("retrieve from disk")
-        report = self.retrieve_from_disk(str(file_sha256))
-        print(str(file_sha256))
+        # report = self.retrieve_from_disk(str(file_sha256))
+        report = self.retrieve_from_db(str(file_sha256))
+        print(report)
         names = "".join(report.detections_names)
         self.render('report.html', sha256=report.hash_value[0], md5=report.hash_value[1], time=report.scan_data, num_engines_detected=report.num_engines_detected, names=names)
         self.clean_up(str(file_sha256))
@@ -85,12 +91,18 @@ class UploadHandler(tornado.web.RequestHandler):
                 else:
                     os.remove("uploads/" + line_hash[num] + ".json")
 
+    def retrieve_from_db(self, file_sha256):
+        myquery = { "resource": str(file_sha256) }
+        mydoc = mycol.find_one(myquery)
+        report = parser.Report(mydoc)
+        print(report.detections_names)
+        return report
 
-    def retrieve_from_disk(self, file_sha256):
-        with open("uploads/"+ file_sha256 +".json", 'rb') as file:
-            report_obj = pickle.load(file)
-            report = parser.Report(report_obj)
-            return report
+    # def retrieve_from_disk(self, file_sha256):
+    #     with open("uploads/"+ file_sha256 +".json", 'rb') as file:
+    #         report_obj = pickle.load(file)
+    #         report = parser.Report(report_obj)
+    #         return report
 
     def upload_to_scan(self, file):
         try:
@@ -106,6 +118,7 @@ class UploadHandler(tornado.web.RequestHandler):
             print(f'Other error occurred: {err}')
         else:     
             data = response.json()
+            # send to mongodb
             resource = data["resource"]
             date = str(datetime.datetime.now())
             res_json = open('uploads/file_metadata.txt', 'a+')
@@ -134,6 +147,11 @@ class UploadHandler(tornado.web.RequestHandler):
             print('report not finished:', data)
             data = requests.get(url, params=params).json()
         res_json = open("uploads/" + resource + ".json", 'wb')
+        
+        #### insert report into the database ###
+        mycol.insert_one(data)
+        ########################################
+
         pickle.dump(data, res_json, pickle.HIGHEST_PROTOCOL)
         res_json.close()
         print('Success! Report generated')
